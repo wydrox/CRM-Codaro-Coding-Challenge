@@ -67,6 +67,60 @@ curl -X POST http://127.0.0.1:8080/api/v1/agents/<agent_id>/heartbeat \
 
 Agent pojawi się automatycznie w Control Plane bez ręcznego `POST /agents`.
 
+### 9. OpenClaw setup (konkretna konfiguracja agenta)
+W konfiguracji spawnowania agenta w OpenClaw ustaw:
+- `CONTROL_PLANE_URL=http://127.0.0.1:8080`
+- `AGENT_ID` unikalny na agenta (np. `worker-01`)
+- `AGENT_NAME` czytelna nazwa (np. `Worker 01`)
+- `AGENT_ROLE` (`worker` lub `supervisor`)
+- `SUPERVISOR_ID` tylko dla agentów podrzędnych
+
+Minimalny command template (shell) dla agenta:
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${CONTROL_PLANE_URL:=http://127.0.0.1:8080}"
+: "${AGENT_ID:?AGENT_ID is required}"
+: "${AGENT_NAME:=Agent ${AGENT_ID}}"
+: "${AGENT_ROLE:=worker}"
+: "${SUPERVISOR_ID:=null}"
+
+heartbeat() {
+  if [ "${SUPERVISOR_ID}" = "null" ] || [ -z "${SUPERVISOR_ID}" ]; then
+    supervisor_json="null"
+  else
+    supervisor_json="\"${SUPERVISOR_ID}\""
+  fi
+
+  curl -s -X POST "${CONTROL_PLANE_URL}/api/v1/agents/${AGENT_ID}/heartbeat" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"name\": \"${AGENT_NAME}\",
+      \"role\": \"${AGENT_ROLE}\",
+      \"status\": \"busy\",
+      \"capabilities\": [\"openclaw\"],
+      \"supervisor_id\": ${supervisor_json}
+    }" >/dev/null
+}
+
+# Heartbeat loop co 10s
+(
+  while true; do
+    heartbeat || true
+    sleep 10
+  done
+) &
+
+# Tu uruchamiasz właściwy proces agenta OpenClaw
+exec your-openclaw-agent-command
+```
+
+Po podstawieniu `your-openclaw-agent-command` agent będzie automatycznie widoczny w:
+- `GET /api/v1/agents`
+- `GET /api/v1/agents/tree`
+- `GET /api/v1/overview`
+
 ## Runtime configuration
 Domyślne ustawienia:
 - `PORT=8080`
