@@ -1,176 +1,109 @@
-# CRM Codaro Coding Challenge
+# Control Plane API (Convex-only)
 
-# Control Plane API (JS)
+API control plane dla agentów OpenClaw, działające wyłącznie na Convex (bez SQLite).
 
-Pełne API control plane dla agentów OpenClaw na jednym urządzeniu (MacMini), bez UI.
+## Setup
 
-## Setup Instructions (GitHub)
+1. Zainstaluj zależności:
 
-### 1. Prerequisites
-- `Node.js >= 20`
-- `npm >= 10`
-- `git`
-
-### 2. Clone repository
-```bash
-git clone git@github.com:wydrox/CRM-Codaro-Coding-Challenge.git
-cd CRM-Codaro-Coding-Challenge
-```
-
-### 3. Install dependencies
 ```bash
 npm install
 ```
 
-### 4. Configure environment
-Utwórz plik `.env` (opcjonalnie, wartości domyślne działają od razu):
+2. Skonfiguruj `.env`:
+
 ```bash
+DATA_BACKEND=convex
 PORT=8080
 HOST=127.0.0.1
-DATABASE_URL=./control_plane.db
 HEARTBEAT_OFFLINE_SEC=35
+CONVEX_SYNC_URL=https://hearty-chinchilla-856.eu-west-1.convex.site
+CONVEX_API_PATH=/control-plane-api
+CONVEX_SYNC_PATH=/control-plane-sync
+CONVEX_SYNC_TOKEN=change-me-strong-token
+CONVEX_SYNC_TIMEOUT_MS=5000
 ```
 
-### 5. Run locally (development)
-```bash
-npm run dev
-```
+3. Uruchom API:
 
-### 6. Run in production mode
 ```bash
 npm start
 ```
 
-### 7. Smoke test
-```bash
-curl http://127.0.0.1:8080/health/live
-curl http://127.0.0.1:8080/health/ready
+Przy pierwszym uruchomieniu serwer bootstrappuje domyślną organizację/użytkownika i może wypisać jednorazowy klucz API w logu (`Bootstrap API key ...`).
+
+## Auth
+
+Każde żądanie do `/api/v1/*` wymaga nagłówka:
+
+```http
+X-API-Key: <twoj_klucz>
 ```
 
-Oczekiwane odpowiedzi:
-- `{"status":"ok"}`
-- `{"status":"ready"}`
+`/health/*` nie wymaga auth.
 
-### 8. OpenClaw integration (agent auto-registration)
-Po starcie agenta w OpenClaw wywołuj heartbeat:
-```bash
-curl -X POST http://127.0.0.1:8080/api/v1/agents/<agent_id>/heartbeat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Worker 1",
-    "role": "worker",
-    "status": "busy",
-    "capabilities": ["javascript"],
-    "supervisor_id": null
-  }'
-```
+## OpenClaw heartbeat
 
-Agent pojawi się automatycznie w Control Plane bez ręcznego `POST /agents`.
+OpenClaw powinien wysyłać heartbeat:
 
-### 9. OpenClaw setup (minimal step, bez skryptów)
-W OpenClaw ustaw tylko te dane dla każdego agenta:
-- `control_plane_url`: `http://127.0.0.1:8080`
-- `agent_id`: unikalny identyfikator, np. `worker-01`
-- `agent_name`: np. `Worker 01`
-- `agent_role`: `worker` lub `supervisor`
-- `supervisor_id`: tylko dla child-agentów (dla root: puste/null)
-
-Następnie skonfiguruj w OpenClaw heartbeat HTTP:
-- metoda: `POST`
-- URL: `http://127.0.0.1:8080/api/v1/agents/{agent_id}/heartbeat`
-- interwał: `10s`
+- `POST http://127.0.0.1:8080/api/v1/agents/{agent_id}/heartbeat`
 - `Content-Type: application/json`
+- interwał: np. `10s`
 
-Body heartbeat:
+Body:
+
 ```json
 {
   "name": "{agent_name}",
   "role": "{agent_role}",
   "status": "busy",
   "capabilities": ["openclaw"],
-  "supervisor_id": "{supervisor_id_or_null}"
+  "supervisor_id": null
 }
 ```
 
-To wszystko. Po pierwszym heartbeat agent rejestruje się automatycznie i jest widoczny w:
-- `GET /api/v1/agents`
-- `GET /api/v1/agents/tree`
-- `GET /api/v1/overview`
+## Endpointy dostępne
 
-## Runtime configuration
-Domyślne ustawienia:
-- `PORT=8080`
-- `HOST=127.0.0.1`
-- `DATABASE_URL=./control_plane.db`
-- `HEARTBEAT_OFFLINE_SEC=35`
-
-## API Endpoints
-
-### Agents
 - `POST /api/v1/agents`
 - `GET /api/v1/agents`
 - `GET /api/v1/agents/:agentId`
 - `PATCH /api/v1/agents/:agentId`
-- `POST /api/v1/agents/:agentId/heartbeat` (auto-register/upsert)
+- `POST /api/v1/agents/:agentId/heartbeat`
 - `GET /api/v1/agents/:agentId/children`
 - `GET /api/v1/agents/tree`
-
-### Tasks
 - `POST /api/v1/tasks`
 - `GET /api/v1/tasks`
 - `GET /api/v1/tasks/:taskId`
 - `PATCH /api/v1/tasks/:taskId`
 - `POST /api/v1/tasks/:taskId/events`
 - `GET /api/v1/tasks/:taskId/events`
-
-### Commands
 - `POST /api/v1/agents/:agentId/commands`
 - `GET /api/v1/agents/:agentId/commands`
 - `GET /api/v1/commands`
 - `POST /api/v1/commands/:commandId/ack`
-
-### Alerts
 - `POST /api/v1/alerts`
 - `GET /api/v1/alerts`
 - `POST /api/v1/alerts/:alertId/ack`
 - `POST /api/v1/alerts/:alertId/close`
-
-### Operational View / Health
 - `GET /api/v1/overview`
+- `POST /api/v1/convex/sync/agents`
+- `POST /api/v1/auth/api-keys`
+- `GET /api/v1/auth/api-keys`
+- `POST /api/v1/auth/api-keys/:keyId/rotate`
+- `POST /api/v1/auth/api-keys/:keyId/revoke`
 - `GET /health/live`
 - `GET /health/ready`
 
-## Quick Examples
+## Convex files
 
-### 1) Auto-register agent by heartbeat
+Pliki Convex w repo:
 
-```bash
-curl -X POST http://127.0.0.1:8080/api/v1/agents/agent-1/heartbeat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Code Worker 1",
-    "role": "worker",
-    "status": "busy",
-    "capabilities": ["javascript", "refactor"],
-    "queue_depth": 2
-  }'
-```
+- `convex/schema.ts`
+- `convex/controlPlane.ts`
+- `convex/http.ts`
 
-### 2) Create task
+Po zmianach w `convex/` wypchnij je:
 
 ```bash
-curl -X POST http://127.0.0.1:8080/api/v1/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Analyze repository",
-    "assigned_agent_id": "agent-1",
-    "status": "queued",
-    "priority": "high"
-  }'
-```
-
-### 3) Operational overview
-
-```bash
-curl http://127.0.0.1:8080/api/v1/overview
+npx convex dev --once
 ```
