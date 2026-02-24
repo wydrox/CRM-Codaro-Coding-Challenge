@@ -1,0 +1,3 @@
+node_modules/
+*.db
+control_plane/__pycache__/
