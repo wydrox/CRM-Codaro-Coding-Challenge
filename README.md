@@ -1,3 +1,5 @@
+# CRM Codaro Coding Challenge
+
 # Control Plane API (JS)
 
 Pełne API control plane dla agentów OpenClaw na jednym urządzeniu (MacMini), bez UI.
