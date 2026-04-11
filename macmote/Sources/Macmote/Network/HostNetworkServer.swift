@@ -101,7 +101,7 @@ private final class ClientSession {
     var onDisconnect: (() -> Void)?
     var onClientInfo: ((String, String) -> Void)?
 
-    private let decoder = JSONDecoder()
+    private var handshakeReceived = false
 
     init(connection: NWConnection) {
         self.connection = connection
@@ -130,10 +130,11 @@ private final class ClientSession {
         do {
             while true {
                 let data = try await readLengthPrefixedMessage(from: connection)
-                let envelope = try decoder.decode(MessageEnvelope.self, from: data)
-                if envelope.type == .handshakeAck {
-                    let ack = try decoder.decode(HandshakeAck.self, from: envelope.payload)
+                let envelope = try JSONDecoder().decode(MessageEnvelope.self, from: data)
+                if !handshakeReceived, envelope.type == .handshakeAck {
+                    let ack = try JSONDecoder().decode(HandshakeAck.self, from: envelope.payload)
                     onClientInfo?(ack.clientName, address)
+                    handshakeReceived = true
                 }
                 onMessage?(envelope)
             }
