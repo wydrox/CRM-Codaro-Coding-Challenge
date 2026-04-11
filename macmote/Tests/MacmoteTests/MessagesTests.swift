@@ -34,12 +34,12 @@ import Testing
 }
 
 @Test func clipboardUpdateTextCodable() throws {
-    let clip = ClipboardUpdate(content: .text("Hello, World!"), changeCount: 5, origin: "host")
+    let clip = ClipboardUpdate(content: .text("Hello, World!"), changeCount: 5, origin: .host)
     let data = try MessageCoder.encode(clip, type: .clipboardUpdate, sequence: 4)
     let env = try MessageCoder.decode(data)
     let decoded = try MessageCoder.decodePayload(ClipboardUpdate.self, from: env)
     if case .text(let str) = decoded.content {
         #expect(str == "Hello, World!")
     }
-    #expect(decoded.origin == "host")
+    #expect(decoded.origin == .host)
 }

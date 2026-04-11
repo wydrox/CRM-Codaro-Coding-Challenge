@@ -138,11 +138,15 @@ public struct ClipboardUpdate: Codable {
         case imageJpeg(Data)
         case unsupported
     }
+    public enum Origin: String, Codable {
+        case host
+        case client
+    }
     public let content: ClipboardContent
     public let changeCount: Int
-    public let origin: String   // "host" or "client" — prevents echo loops
+    public let origin: Origin   // prevents clipboard echo loops between host and client
 
-    public init(content: ClipboardContent, changeCount: Int, origin: String) {
+    public init(content: ClipboardContent, changeCount: Int, origin: Origin) {
         self.content = content
         self.changeCount = changeCount
         self.origin = origin
